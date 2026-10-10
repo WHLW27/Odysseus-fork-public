@@ -508,6 +508,26 @@ def test_untrusted_context_message_arms_gate_by_default_and_can_opt_out():
     assert messages_contain_external_untrusted_context([opted_out]) is False
 
 
+def test_chat_processor_skills_index_is_control_plane_context():
+    """The agent-mode skills index (chat_processor's "available skills index")
+    is server-owned metadata, like the agent loop's "skills" block: it must not
+    block private reads such as list_served_models on an otherwise clean turn,
+    while still gating mutating and code-executing tools."""
+    from src.prompt_security import untrusted_context_message
+
+    context = ToolRunSecurityContext()
+    context.observe_messages([
+        untrusted_context_message(
+            "available skills index",
+            "[Available skills]\n  general:\n    - example: does a thing",
+        )
+    ])
+
+    assert context.external_untrusted_context_seen is True
+    assert context.decision_for("list_served_models").allowed is True
+    assert context.decision_for("bash").allowed is False
+
+
 def test_security_context_can_rescan_late_prompt_messages():
     from src.prompt_security import untrusted_context_message
 
